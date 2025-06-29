@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.routes import upload, generate 
 from app.routes import email  
 
@@ -23,3 +22,8 @@ app.include_router(email.router, prefix="/email")
 @app.get("/")
 def read_root():
     return {"message": "Certificate Generator API"}
+
+@app.get("/debug-routes")
+def debug_routes():
+    return [route.path for route in app.router.routes]
+

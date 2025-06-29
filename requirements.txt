@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+pillow
+pandas
+openpyxl
+pytesseract
+email-validator
+aiofiles
+jinja2
+smtplib
+python-dotenv

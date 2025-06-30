@@ -1,33 +1,41 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-import smtplib
-from email.message import EmailMessage
+import pandas as pd
+from app.utils.certificate_generator import generate_and_send_certificates
+import tempfile
+import shutil
 
 router = APIRouter()
 
-class EmailSchema(BaseModel):
-    to: str
-    subject: str
-    content: str
-
-@router.post("/send")
-async def send_email(email: EmailSchema):
+@router.post("/generate-and-send-uploaded")
+async def generate_and_email_uploaded(
+    excel_file: UploadFile = File(...),
+    template_file: UploadFile = File(...)
+):
     try:
-        sender_email = "ershadpersonal123@gmail.com"
-        sender_password = "cxyt tthe gkvu alei"  # NOT your Gmail password
+        # Save uploaded files to temporary files
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_excel:
+            shutil.copyfileobj(excel_file.file, tmp_excel)
+            excel_path = tmp_excel.name
 
-        message = EmailMessage()
-        message["From"] = sender_email
-        message["To"] = email.to
-        message["Subject"] = email.subject
-        message.set_content(email.content)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_template:
+            shutil.copyfileobj(template_file.file, tmp_template)
+            template_path = tmp_template.name
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(sender_email, sender_password)
-            server.send_message(message)
+        # Read Excel and convert to list of dicts
+        df = pd.read_excel(excel_path)
+        data = df.to_dict(orient="records")
 
-        return JSONResponse(content={"message": "Email sent successfully"})
+        # Generate and send
+        errors = generate_and_send_certificates(data, template_path)
+
+        if errors:
+            return JSONResponse(
+                status_code=207,
+                content={"message": "Some emails failed to send.", "errors": errors}
+            )
+
+        return {"message": "All certificates generated and emailed successfully."}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

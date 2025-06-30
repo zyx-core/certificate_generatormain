@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import upload, generate 
-from app.routes import email  
+from app.routes import upload, generate, extract_excel, extract_image 
+from app.routes import email, mapping  
 
 app = FastAPI()
 
@@ -18,6 +18,9 @@ app.add_middleware(
 app.include_router(upload.router, prefix="/upload")
 app.include_router(generate.router, prefix="/generate")
 app.include_router(email.router, prefix="/email")
+app.include_router(extract_excel.router)
+app.include_router(extract_image.router)
+app.include_router(mapping.router)
 
 @app.get("/")
 def read_root():

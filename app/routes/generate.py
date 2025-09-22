@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Dict
+from typing import List, Dict, Optional
 import base64, tempfile
 import pandas as pd
 from app.utils.certificate_generator import generate_certificates_only, send_certificates_only
@@ -17,14 +17,22 @@ class PlaceholderProperties(BaseModel):
     bold: bool
     font: str = "Roboto" # Add font with a default value
 
+# --- FIXED: Added missing fields ---
 class CertificateData(BaseModel):
     placeholders: Dict[str, PlaceholderProperties]
     excel_data: List[Dict[str, str]]
     template_bytes: str
+    email_column: Optional[str] = None  # Add this field
+    subject: Optional[str] = "Your Certificate"  # Add this field
+    content: Optional[str] = "Please find your certificate attached."  # Add this field
 
 @router.post("/generate-and-send-uploaded")
 async def generate_and_send_uploaded(data: CertificateData):
     try:
+        # Validate required fields for sending emails
+        if not data.email_column:
+            raise HTTPException(status_code=400, detail="email_column is required for sending certificates")
+        
         image_data = base64.b64decode(data.template_bytes)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_template:
             tmp_template.write(image_data)
@@ -38,7 +46,13 @@ async def generate_and_send_uploaded(data: CertificateData):
             placeholders=data.placeholders
         )
         
-        email_logs = send_certificates_only(records)
+        # Now these fields exist on the data object
+        email_logs = send_certificates_only(
+            data_list=records,
+            email_column_name=data.email_column,
+            subject=data.subject,
+            content=data.content
+        )
 
         return {
             "message": "Process completed.",

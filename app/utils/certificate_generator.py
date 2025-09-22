@@ -29,7 +29,6 @@ def get_font(font_name: str, is_bold: bool, font_size: int) -> ImageFont.FreeTyp
         print(f"⚠️ Font file not found at '{font_path}'. Using default font.")
         return ImageFont.load_default()
 
-# --- THIS FUNCTION CONTAINS THE CRITICAL FIX ---
 def draw_certificate(template_path: str, output_path: str, data: dict, placeholders):
     """Draw text on the certificate template using settings from the frontend."""
     cert = Image.open(template_path).convert("RGB")
@@ -38,14 +37,11 @@ def draw_certificate(template_path: str, output_path: str, data: dict, placehold
     
     for field, settings in placeholders.items():
         value = str(data.get(field, field))
-
-        # --- FIX: Use object dot notation (.key) instead of dictionary brackets (['key']) ---
         font_size = int(settings.font_size)
         font_name = settings.font
         bold = settings.bold
         x, y = settings.x, settings.y
         color = settings.color
-        # --- END FIX ---
         
         font = get_font(font_name, bold, font_size)
         
@@ -85,25 +81,32 @@ def generate_certificates_only(data_list, template_path, placeholders, is_previe
             
     return generated_path if is_preview else errors
 
-# In certificate_generator.py
-
-def send_certificates_only(data_list):
-    """Connects once and sends all emails in a parallel batch, SAFELY."""
+# --- THIS IS THE UPDATED FUNCTION ---
+def send_certificates_only(data_list, email_column_name, subject, content):
+    """Connects once and sends all emails with custom content in a parallel batch."""
     smtp_host = os.getenv("EMAIL_HOST")
     smtp_port = int(os.getenv("EMAIL_PORT", 587))
     sender_email = os.getenv("EMAIL_ADDRESS")
     sender_password = os.getenv("EMAIL_PASSWORD")
 
+    if not all([smtp_host, sender_email, sender_password]):
+        return {"successes": [], "errors": ["Server is not configured for sending emails."]}
+
     success_logs = []
     error_logs = []
     log_lock = threading.Lock()
-    # --- FIX: Create a new lock specifically for the server connection ---
     server_lock = threading.Lock()
 
-    # The helper function now accepts the server_lock
     def send_single_email(server, lock, row):
         name = row.get("Name", "Unnamed")
-        email = row.get("Email")
+        # --- CHANGE: Use the dynamic column name ---
+        email = row.get(email_column_name)
+
+        if not email:
+            with log_lock:
+                error_logs.append(f"❌ Email not found for {name} in column '{email_column_name}'")
+            return
+
         try:
             print(f"🔹 Preparing email for {name} <{email}>")
             cert_path = os.path.join(OUTPUT_DIR, f"{name}.png")
@@ -113,16 +116,18 @@ def send_certificates_only(data_list):
             msg = EmailMessage()
             msg["From"] = sender_email
             msg["To"] = email
-            msg["Subject"] = "You're In! Welcome to the PORT:80 Crew!"
-            msg.set_content(f"Hi {name},\n\nCongratulations and welcome!")
+            
+            # --- CHANGE: Use dynamic subject and content ---
+            msg["Subject"] = subject
+            personalized_content = content.replace("{Name}", name)
+            msg.set_content(personalized_content)
+            # --- END CHANGE ---
 
             with open(cert_path, "rb") as f:
                 msg.add_attachment(f.read(), maintype="image", subtype="png", filename=f"{name}.png")
 
-            # --- FIX: Use the lock to ensure only one thread sends at a time ---
             with lock:
                 server.send_message(msg)
-            # --- END FIX ---
             
             with log_lock:
                 success_logs.append(f"✅ Email successfully sent to {email}")
@@ -138,7 +143,6 @@ def send_certificates_only(data_list):
             print("✅ SMTP Login Successful. Starting parallel email dispatch...")
 
             with ThreadPoolExecutor(max_workers=5) as executor:
-                # We now pass the server_lock to each worker
                 for row in data_list:
                     executor.submit(send_single_email, server, server_lock, row)
         

@@ -39,4 +39,6 @@ def read_root():
 @app.get("/debug-routes", tags=["Debug"])
 def debug_routes():
     """Returns all registered route paths (for testing purposes)."""
+    return {"message": "Certificate Generator API is up and running."}
     return [route.path for route in app.router.routes]
+

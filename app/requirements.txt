@@ -1,9 +1,7 @@
 fastapi
 uvicorn[standard]
 
-# Add other dependencies your routes might need, for example:
+# Add other libraries your app needs, for example:
 # pandas
 # openpyxl
 # Pillow
-# python-multipart
-# boto3

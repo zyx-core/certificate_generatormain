@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-
-# Add other libraries your app needs, for example:
-# pandas
-# openpyxl
-# Pillow

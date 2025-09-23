@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+
+# Add other dependencies your routes might need, for example:
+# pandas
+# openpyxl
+# Pillow
+# python-multipart
+# boto3
